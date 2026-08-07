@@ -1,0 +1,26 @@
+# Environment & Keys
+.env
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Data & Persistence
+*.db
+app.db
+data/
+data/uploads/
+data/faiss_index/
+data/test_faiss/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
