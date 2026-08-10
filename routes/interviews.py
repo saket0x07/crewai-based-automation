@@ -112,7 +112,7 @@ def get_next_question(interview_id: str, db: Session = Depends(get_db)):
 @router.post("/{interview_id}/answer")
 def submit_answer_and_proceed(
     interview_id: str,
-    payload: SubmitAnswerRequest,
+    payload: SubmitAnswerRequest = SubmitAnswerRequest(),
     db: Session = Depends(get_db)
 ):
     """Records user answer or proceed choice for the current question and advances interview state."""

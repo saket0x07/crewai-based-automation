@@ -97,8 +97,17 @@ class QuestionResponse(BaseModel):
 
 
 class SubmitAnswerRequest(BaseModel):
-    response_text: Optional[str] = Field(default=None, description="Candidate's answer text")
+    response_text: Optional[str] = Field(default="", description="Candidate's answer text")
     proceed: bool = Field(default=True, description="True to move to next question")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "response_text": "I used Python, FastAPI, and FAISS to build real-time AI pipelines.",
+                "proceed": True
+            }
+        }
+    }
 
 
 class EvaluationReportResponse(BaseModel):
