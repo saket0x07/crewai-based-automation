@@ -1,8 +1,9 @@
 import uuid
-from typing import List
+from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
+
 
 from database import get_db
 from models import ResumeModel, ParsedResumeModel, MockInterviewModel, InterviewQALogModel, InterviewEvaluationModel
@@ -170,11 +171,12 @@ def submit_answer_and_proceed(
 async def submit_voice_answer_and_proceed(
     interview_id: str,
     file: UploadFile = File(...),
+    live_transcript: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     """
     Submits in-browser recorded audio blob for current interview question:
-    1. Transcribes audio in real-time via OpenAI Whisper.
+    1. Transcribes audio in real-time via OpenAI Whisper or live browser speech recognition.
     2. Saves transcribed response text into SQLite.
     3. Advances question state machine.
     4. Returns real-time transcript JSON to browser UI.
@@ -188,8 +190,9 @@ async def submit_voice_answer_and_proceed(
 
     file_bytes = await file.read()
     filename = file.filename or "recording.webm"
-    transcribe_result = transcribe_audio_file(file_bytes, filename)
+    transcribe_result = transcribe_audio_file(file_bytes, filename, live_transcript=live_transcript)
     transcript_text = transcribe_result.get("transcript", "").strip()
+
 
     current_qa = db.query(InterviewQALogModel).filter(
         InterviewQALogModel.interview_id == interview_id,
@@ -271,6 +274,7 @@ def finalize_interview_and_evaluate(interview_id: str, db: Session = Depends(get
         weaknesses=eval_record.weaknesses,
         areas_of_improvement=eval_record.areas_of_improvement,
         detailed_report=eval_record.detailed_report,
+        qa_transcript=qa_transcript,
         created_at=eval_record.created_at
     )
 
@@ -282,6 +286,18 @@ def get_interview_report(interview_id: str, db: Session = Depends(get_db)):
     if not eval_record:
         raise HTTPException(status_code=404, detail=f"No evaluation report found for interview_id: {interview_id}")
 
+    qa_logs = db.query(InterviewQALogModel).filter(InterviewQALogModel.interview_id == interview_id).all()
+    qa_transcript = [
+        {
+            "question_number": log.question_number,
+            "category": log.question_category,
+            "question_text": log.question_text,
+            "user_response": log.user_response or "Skipped / No Answer",
+            "skipped": log.skipped
+        }
+        for log in qa_logs
+    ]
+
     return EvaluationReportResponse(
         evaluation_id=eval_record.evaluation_id,
         interview_id=eval_record.interview_id,
@@ -291,5 +307,7 @@ def get_interview_report(interview_id: str, db: Session = Depends(get_db)):
         weaknesses=eval_record.weaknesses,
         areas_of_improvement=eval_record.areas_of_improvement,
         detailed_report=eval_record.detailed_report,
+        qa_transcript=qa_transcript,
         created_at=eval_record.created_at
     )
+

@@ -120,7 +120,9 @@ class EvaluationReportResponse(BaseModel):
     weaknesses: List[str]
     areas_of_improvement: List[str]
     detailed_report: str
+    qa_transcript: List[dict] = Field(default_factory=list, description="Full Q&A transcript with spoken voice answers")
     created_at: datetime
+
 
 
 class TranscriptionResponse(BaseModel):

@@ -1,15 +1,17 @@
-document.addEventListener("DOMContentLoaded", () => {
+function initApp() {
   // Application State
   let currentInterviewId = null;
   let currentDocumentId = null;
   let totalQuestions = 5;
   let currentQuestionIndex = 0;
   
-  // MediaRecorder state
+  // MediaRecorder & SpeechRecognition state
   let mediaRecorder = null;
   let audioChunks = [];
   let recordingTimerInterval = null;
   let recordingSeconds = 0;
+  let speechRecognition = null;
+  let capturedLiveTranscript = "";
 
   // DOM Elements
   const stepSetup = document.getElementById("step-setup");
@@ -66,6 +68,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   loadCandidates();
+  if (candidateSelect) {
+    candidateSelect.addEventListener("focus", loadCandidates, { once: true });
+  }
+
 
 
   // 2. Handle Resume File Upload
@@ -189,6 +195,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+
   // 5. Microphone Recording Logic
   btnMic.addEventListener("click", startRecording);
   btnStopVoice.addEventListener("click", stopAndSubmitVoiceRecording);
@@ -202,6 +209,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunks = [];
+      capturedLiveTranscript = "";
       mediaRecorder = new MediaRecorder(stream);
 
       mediaRecorder.ondataavailable = (event) => {
@@ -210,10 +218,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
       mediaRecorder.start(100);
 
+      // Initialize Web Speech API for real-time live browser transcription
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          speechRecognition = new SpeechRecognition();
+          speechRecognition.continuous = true;
+          speechRecognition.interimResults = true;
+          speechRecognition.lang = 'en-US';
+
+          speechRecognition.onresult = (event) => {
+            let currentText = "";
+            for (let i = 0; i < event.results.length; i++) {
+              currentText += event.results[i][0].transcript + " ";
+            }
+            capturedLiveTranscript = currentText.trim();
+            if (capturedLiveTranscript) {
+              transcriptText.textContent = `"${capturedLiveTranscript}"`;
+              transcriptContainer.classList.remove("hidden");
+            }
+          };
+
+          speechRecognition.start();
+        } catch (srErr) {
+          console.warn("Browser SpeechRecognition initialization warning:", srErr);
+        }
+      }
+
       // UI state during recording
       btnMic.classList.add("recording");
       btnStopVoice.classList.remove("hidden");
-      recordingStatus.textContent = "🎙️ Recording Audio Answer...";
+      recordingStatus.textContent = "🎙️ Recording Audio Answer... Speak now!";
       recordingStatus.style.color = "var(--danger)";
 
       recordingSeconds = 0;
@@ -232,6 +267,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function resetRecordingUI() {
+    if (speechRecognition) {
+      try { speechRecognition.stop(); } catch(e) {}
+      speechRecognition = null;
+    }
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
       if (mediaRecorder.stream) {
@@ -249,9 +288,13 @@ document.addEventListener("DOMContentLoaded", () => {
   async function stopAndSubmitVoiceRecording() {
     if (!mediaRecorder || mediaRecorder.state === "inactive") return;
 
-    recordingStatus.textContent = "⚡ Transcribing Speech via OpenAI Whisper...";
+    recordingStatus.textContent = "⚡ Processing & Saving Speech Transcript...";
     recordingStatus.style.color = "var(--accent)";
     btnStopVoice.disabled = true;
+
+    if (speechRecognition) {
+      try { speechRecognition.stop(); } catch(e) {}
+    }
 
     mediaRecorder.stop();
     if (mediaRecorder.stream) {
@@ -259,11 +302,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     clearInterval(recordingTimerInterval);
 
-    // Give small delay for last audio chunk
+    // Give small delay for last audio chunk & WebSpeech result
     setTimeout(async () => {
       const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
       const formData = new FormData();
       formData.append("file", audioBlob, `answer_q${currentQuestionIndex}.webm`);
+      if (capturedLiveTranscript) {
+        formData.append("live_transcript", capturedLiveTranscript);
+      }
 
       try {
         const res = await fetch(`/api/v1/interview/${currentInterviewId}/answer/voice`, {
@@ -295,8 +341,9 @@ document.addEventListener("DOMContentLoaded", () => {
         btnStopVoice.disabled = false;
         resetRecordingUI();
       }
-    }, 300);
+    }, 400);
   }
+
 
   // 6. Text Answer Submit (Fallback)
   btnSubmitText.addEventListener("click", async () => {
@@ -368,10 +415,43 @@ document.addEventListener("DOMContentLoaded", () => {
       renderList(evalAreas, report.areas_of_improvement, "icon-yellow", "📌");
 
       evalReport.textContent = report.detailed_report || "Candidate transcript evaluated successfully.";
+      renderTranscripts(document.getElementById("eval-transcript-list"), report.qa_transcript);
     } catch (e) {
       evalReport.textContent = "Error finalizing evaluation: " + e.message;
     }
   }
+
+  function renderTranscripts(container, transcriptItems) {
+    if (!container) return;
+    container.innerHTML = "";
+    if (!Array.isArray(transcriptItems) || transcriptItems.length === 0) {
+      container.innerHTML = `<div style="color: var(--text-muted); font-style: italic;">No transcript logs recorded.</div>`;
+      return;
+    }
+
+    transcriptItems.forEach(item => {
+      const card = document.createElement("div");
+      card.style.cssText = "background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem;";
+      
+      const cat = (item.category || "Technical").toUpperCase();
+      const userResp = item.user_response || "Skipped / No Answer";
+      const isSkipped = item.skipped || userResp.includes("Skipped");
+
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--accent);">Q${item.question_number} • ${cat}</span>
+          ${isSkipped ? '<span style="font-size: 0.75rem; color: var(--warning); background: rgba(245, 158, 11, 0.15); padding: 0.2rem 0.5rem; border-radius: 4px;">Skipped</span>' : '<span style="font-size: 0.75rem; color: var(--success); background: rgba(16, 185, 129, 0.15); padding: 0.2rem 0.5rem; border-radius: 4px;">Answered</span>'}
+        </div>
+        <div style="font-weight: 600; font-size: 1rem; color: var(--text-main); margin-top: 0.25rem;">${item.question_text}</div>
+        <div style="background: rgba(6, 182, 212, 0.08); border-left: 3px solid var(--accent); padding: 0.75rem; border-radius: 6px; margin-top: 0.5rem;">
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem;">🎙️ Candidate Spoken Voice Answer / Real-Time Transcript:</div>
+          <div style="font-size: 0.95rem; font-style: italic; color: var(--text-main); line-height: 1.5;">"${userResp}"</div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
 
   function renderList(container, items, colorClass, symbol) {
     container.innerHTML = "";
@@ -390,5 +470,13 @@ document.addEventListener("DOMContentLoaded", () => {
   btnRestart.addEventListener("click", () => {
     stepEvaluation.classList.add("hidden");
     stepSetup.classList.remove("hidden");
+    loadCandidates();
   });
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initApp);
+} else {
+  initApp();
+}
+
