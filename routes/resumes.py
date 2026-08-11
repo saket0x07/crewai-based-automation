@@ -14,9 +14,10 @@ router = APIRouter(prefix="/api/v1/resumes", tags=["Resumes"])
 vector_manager = FAISSVectorStoreManager()
 
 
-@router.get("", response_model=List[dict])
-@router.get("/", response_model=List[dict])
+@router.get("", response_model=list[dict])
+@router.get("/", response_model=list[dict])
 def list_parsed_resumes(db: Session = Depends(get_db)):
+
     """Lists all stored candidate resumes from SQLite for dropdown selection in UI and CLI."""
     parsed_records = db.query(ParsedResumeModel).order_by(ParsedResumeModel.created_at.desc()).all()
     results = []
