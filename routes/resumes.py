@@ -14,6 +14,26 @@ router = APIRouter(prefix="/api/v1/resumes", tags=["Resumes"])
 vector_manager = FAISSVectorStoreManager()
 
 
+@router.get("", response_model=List[dict])
+@router.get("/", response_model=List[dict])
+def list_parsed_resumes(db: Session = Depends(get_db)):
+    """Lists all stored candidate resumes from SQLite for dropdown selection in UI and CLI."""
+    parsed_records = db.query(ParsedResumeModel).order_by(ParsedResumeModel.created_at.desc()).all()
+    results = []
+    for r in parsed_records:
+        resume_meta = db.query(ResumeModel).filter(ResumeModel.document_id == r.document_id).first()
+        filename = resume_meta.filename if resume_meta else "Uploaded Resume"
+        results.append({
+            "document_id": r.document_id,
+            "candidate_name": r.candidate_name or "Candidate",
+            "email": r.email or "N/A",
+            "filename": filename,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        })
+    return results
+
+
+
 @router.post("/upload", response_model=ResumeUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_and_ingest_resume(
     file: UploadFile = File(...),

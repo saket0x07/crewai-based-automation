@@ -49,17 +49,24 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1. Fetch Existing Candidates
   async function loadCandidates() {
     try {
-      const res = await fetch("/api/v1/resumes/upload", { method: "OPTIONS" }).catch(() => null);
-      // Fetch stored resumes via database API if available or mock candidates
-      candidateSelect.innerHTML = `
-        <option value="mock-1">Alice Smith (Senior Data Engineer)</option>
-        <option value="mock-2">Saket (AI Systems Engineer)</option>
-      `;
+      const res = await fetch("/api/v1/resumes/");
+      if (!res.ok) throw new Error(await res.text());
+      const candidates = await res.json();
+      
+      if (Array.isArray(candidates) && candidates.length > 0) {
+        candidateSelect.innerHTML = candidates.map(c => 
+          `<option value="${c.document_id}">${c.candidate_name} (${c.filename})</option>`
+        ).join("");
+      } else {
+        candidateSelect.innerHTML = `<option value="">-- No saved candidates found. Upload a resume below --</option>`;
+      }
     } catch (e) {
-      console.warn("Error loading candidates:", e);
+      console.warn("Error loading candidates from backend:", e);
+      candidateSelect.innerHTML = `<option value="">-- No saved candidates found. Upload a resume below --</option>`;
     }
   }
   loadCandidates();
+
 
   // 2. Handle Resume File Upload
   async function uploadResumeFile() {
