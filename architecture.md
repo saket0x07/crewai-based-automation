@@ -160,3 +160,18 @@ The following updates remain for future development:
 
 ### 5. Async Job Queue for Heavy Batch Ingestion
 - **Celery / Redis Queue**: Offload high-volume PDF parsing and vector indexing to background worker processes.
+
+### 6. Agent-to-Agent (A2A) Protocol & LangChain Orchestrator Architecture
+- **Decoupled A2A Microservice Servers**: Refactoring the monolith `crew_manager.py` agents into 4 independent A2A-compliant FastAPI servers running on dedicated ports:
+  - `Port 8001`: **Resume Extractor Agent** (A2A Server wrapping CrewAI Extractor)
+  - `Port 8002`: **Resume RAG Chat Agent** (A2A Server wrapping CrewAI Chat Agent)
+  - `Port 8003`: **Interview Generator Agent** (A2A Server wrapping CrewAI Question Generator)
+  - `Port 8004`: `Interview Evaluator Agent` (A2A Server wrapping CrewAI Evaluator)
+- **Standardized A2A Protocol Layer**:
+  - `GET /.well-known/agent.json`: Exposes self-describing **Agent Cards** detailing agent role, skills, inputs/outputs.
+  - `POST /tasks/send`: Asynchronous task execution with status lifecycle tracking (`submitted` → `working` → `completed`).
+  - `POST /tasks/subscribe`: Server-Sent Events (SSE) streaming for real-time progress updates.
+- **Framework-Agnostic Interoperability via LangChain Orchestrator**:
+  - `Port 9000`: **LangChain Orchestrator Agent** acting as an **A2A Client**.
+  - Dynamically discovers and invokes remote CrewAI agents via HTTP A2A calls, demonstrating true cross-framework agent collaboration (LangChain ↔ CrewAI).
+

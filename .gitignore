@@ -24,3 +24,8 @@ data/test_faiss/
 .DS_Store
 .vscode/
 .idea/
+
+# Subprojects
+Blog-writter/
+
+

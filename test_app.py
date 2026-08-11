@@ -14,7 +14,8 @@ def setup_db():
 def test_root_endpoint():
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json()["status"] == "active"
+    assert "Agentic Voice Mock Interview" in response.text or response.json().get("status") == "active"
+
 
 def test_resume_upload_and_mock_interview_flow():
     sample_resume_content = """
@@ -91,12 +92,14 @@ def test_resume_upload_and_mock_interview_flow():
     assert q2_res.status_code == 200
     assert q2_res.json()["question_number"] == 2
 
-    # 7. Answer Question 2
-    ans2_payload = {
-        "response_text": "FastAPI async endpoints allowed non-blocking I/O queries to database pools.",
-        "proceed": True
-    }
-    client.post(f"/api/v1/interview/{interview_id}/answer", json=ans2_payload)
+    # 7. Answer Question 2 via Voice Endpoint
+    fake_audio_bytes = b"RIFF....WAVEfmt ....data...."
+    voice_files = {"file": ("answer_q2.webm", io.BytesIO(fake_audio_bytes), "audio/webm")}
+    ans2_res = client.post(f"/api/v1/interview/{interview_id}/answer/voice", files=voice_files)
+    assert ans2_res.status_code == 200
+    assert ans2_res.json()["status"] == "RECORDED"
+    assert "transcript" in ans2_res.json()
+
 
     # 8. Get Question 3
     q3_res = client.get(f"/api/v1/interview/{interview_id}/next")

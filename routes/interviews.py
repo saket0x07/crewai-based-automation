@@ -1,18 +1,38 @@
 import uuid
 from typing import List
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import ResumeModel, ParsedResumeModel, MockInterviewModel, InterviewQALogModel, InterviewEvaluationModel
 from schemas import (
     InterviewStartRequest, InterviewStartResponse,
-    QuestionResponse, SubmitAnswerRequest, EvaluationReportResponse
+    QuestionResponse, SubmitAnswerRequest, EvaluationReportResponse,
+    TranscriptionResponse, VoiceAnswerResponse
 )
 from agents.crew_manager import generate_interview_questions, evaluate_interview_performance
+from services.audio_transcriber import transcribe_audio_file
 
 router = APIRouter(prefix="/api/v1/interview", tags=["Mock Interview"])
+
+
+@router.post("/transcribe", response_model=TranscriptionResponse)
+async def transcribe_standalone_audio(file: UploadFile = File(...)):
+    """
+    Standalone Speech-to-Text transcription endpoint.
+    Accepts browser recorded audio blobs (.webm, .wav, .mp3, .m4a, .ogg).
+    Returns real-time transcription text without modifying interview state.
+    """
+    file_bytes = await file.read()
+    filename = file.filename or "recording.webm"
+    result = transcribe_audio_file(file_bytes, filename)
+    return TranscriptionResponse(
+        filename=filename,
+        transcript=result.get("transcript", ""),
+        language=result.get("language", "en"),
+        duration_seconds=result.get("duration_seconds", 0.0)
+    )
 
 
 @router.post("/start", response_model=InterviewStartResponse, status_code=status.HTTP_201_CREATED)
@@ -143,6 +163,56 @@ def submit_answer_and_proceed(
         "has_next": has_next,
         "next_question_number": mock_interview.current_index + 1 if has_next else None
     }
+
+
+@router.post("/{interview_id}/answer/voice", response_model=VoiceAnswerResponse)
+async def submit_voice_answer_and_proceed(
+    interview_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Submits in-browser recorded audio blob for current interview question:
+    1. Transcribes audio in real-time via OpenAI Whisper.
+    2. Saves transcribed response text into SQLite.
+    3. Advances question state machine.
+    4. Returns real-time transcript JSON to browser UI.
+    """
+    mock_interview = db.query(MockInterviewModel).filter(MockInterviewModel.interview_id == interview_id).first()
+    if not mock_interview:
+        raise HTTPException(status_code=404, detail=f"Interview session {interview_id} not found.")
+
+    if mock_interview.current_index >= mock_interview.total_questions:
+        raise HTTPException(status_code=400, detail="Interview is already completed.")
+
+    file_bytes = await file.read()
+    filename = file.filename or "recording.webm"
+    transcribe_result = transcribe_audio_file(file_bytes, filename)
+    transcript_text = transcribe_result.get("transcript", "").strip()
+
+    current_qa = db.query(InterviewQALogModel).filter(
+        InterviewQALogModel.interview_id == interview_id,
+        InterviewQALogModel.question_number == mock_interview.current_index + 1
+    ).first()
+
+    if current_qa:
+        current_qa.user_response = transcript_text
+        current_qa.skipped = not transcript_text
+
+    question_num = mock_interview.current_index + 1
+    mock_interview.current_index += 1
+    db.commit()
+
+    has_next = mock_interview.current_index < mock_interview.total_questions
+    return VoiceAnswerResponse(
+        status="RECORDED",
+        interview_id=interview_id,
+        question_number=question_num,
+        transcript=transcript_text,
+        has_next=has_next,
+        next_question_number=mock_interview.current_index + 1 if has_next else None
+    )
+
 
 
 @router.post("/{interview_id}/finalize", response_model=EvaluationReportResponse)

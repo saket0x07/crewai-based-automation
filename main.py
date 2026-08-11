@@ -1,5 +1,8 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from config import settings
 from database import init_db
@@ -25,13 +28,22 @@ app.add_middleware(
 app.include_router(resumes_router)
 app.include_router(interviews_router)
 
+# Mount Static Files for Web Interface
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 @app.on_event("startup")
 def on_startup():
     """Initializes database tables on application launch."""
     init_db()
 
 @app.get("/")
-def root():
+def serve_ui():
+    """Serves the interactive voice mock interview Web UI."""
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {
         "message": "Welcome to Agentic Resume & Mock Interview API",
         "docs": "/docs",

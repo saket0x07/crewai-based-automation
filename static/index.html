@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentic Mock Interview & Real-Time Voice Assessment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- App Header -->
+    <header class="app-header">
+      <h1 class="app-title">Agentic Voice Mock Interview</h1>
+      <p class="app-subtitle">Real-time voice capture, instant Speech-to-Text transcription & AI Evaluation by CrewAI</p>
+    </header>
+
+    <!-- STEP 1: SETUP & CANDIDATE SELECT -->
+    <section id="step-setup" class="glass-card">
+      <h2 style="margin-bottom: 1rem; font-size: 1.4rem;">Candidate Resume & Interview Setup</h2>
+      
+      <div class="form-group">
+        <label for="candidate-select">Select Candidate Resume</label>
+        <select id="candidate-select">
+          <option value="">-- Loading resumes... --</option>
+        </select>
+      </div>
+
+      <div style="text-align: center; margin: 1rem 0; color: var(--text-muted);">— OR —</div>
+
+      <div class="form-group">
+        <label for="resume-file">Upload New Resume (.pdf, .docx, .txt)</label>
+        <input type="file" id="resume-file" accept=".pdf,.docx,.txt">
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem;">
+        <div class="form-group">
+          <label for="target-role">Target Job Role</label>
+          <input type="text" id="target-role" placeholder="e.g. Senior AI Engineer / Backend Developer" value="AI Engineer">
+        </div>
+        <div class="form-group">
+          <label for="num-questions">Number of Questions</label>
+          <select id="num-questions">
+            <option value="3">3 Questions</option>
+            <option value="5" selected>5 Questions</option>
+            <option value="7">7 Questions</option>
+            <option value="10">10 Questions</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="btn-start-interview" class="btn" style="width: 100%; margin-top: 1rem;">
+        🚀 Start Mock Interview Session
+      </button>
+    </section>
+
+    <!-- STEP 2: VOICE QUESTION CARD -->
+    <section id="step-question" class="glass-card hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span id="question-category" class="badge">TECHNICAL</span>
+        <span id="question-progress" style="font-weight: 700; color: var(--text-muted);">Question 1 of 5</span>
+      </div>
+
+      <div class="progress-container">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+
+      <h3 id="question-text" style="font-size: 1.3rem; margin: 1.5rem 0; line-height: 1.5;">
+        Question prompt will appear here...
+      </h3>
+
+      <!-- Voice Recording Box -->
+      <div class="recording-box">
+        <div class="mic-pulse-container">
+          <button id="btn-mic" class="mic-icon-btn" title="Click to Start Recording Answer">
+            🎙️
+          </button>
+        </div>
+        
+        <div>
+          <div id="recording-status" style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">
+            Click Mic to Start Answering
+          </div>
+          <div id="recording-timer" class="timer">00:00</div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; justify-content: center; width: 100%;">
+          <button id="btn-stop-voice" class="btn btn-danger hidden">
+            🛑 Stop & Submit Answer
+          </button>
+          <button id="btn-skip" class="btn btn-secondary">
+            ⏭️ Skip Question
+          </button>
+        </div>
+      </div>
+
+      <!-- Real-Time Transcript Display -->
+      <div id="transcript-container" class="transcript-card hidden">
+        <div class="transcript-header">
+          <span>✨ Real-Time Speech Transcript Captured:</span>
+        </div>
+        <div id="transcript-text" class="transcript-body">
+          Transcribed answer text will be displayed here...
+        </div>
+      </div>
+
+      <!-- Manual Text Input Option (Fallback) -->
+      <details style="margin-top: 1.5rem; color: var(--text-muted);">
+        <summary style="cursor: pointer; font-size: 0.9rem;">Or Type Answer Manually (Optional)</summary>
+        <div class="form-group" style="margin-top: 0.75rem;">
+          <textarea id="text-answer-input" rows="3" placeholder="Type your answer text here if microphone is unavailable..."></textarea>
+          <button id="btn-submit-text" class="btn btn-secondary" style="margin-top: 0.5rem;">
+            Submit Typed Answer
+          </button>
+        </div>
+      </details>
+    </section>
+
+    <!-- STEP 3: SCORECARD EVALUATION REPORT -->
+    <section id="step-evaluation" class="glass-card hidden">
+      <h2 style="text-align: center; font-size: 1.6rem;">Candidate Mock Interview Evaluation</h2>
+      <p style="text-align: center; color: var(--text-muted); margin-bottom: 1.5rem;">
+        Analyzed by CrewAI InterviewEvaluatorAgent
+      </p>
+
+      <div class="score-circle-container">
+        <div class="score-circle">
+          <span id="eval-score" class="score-value">85</span>
+          <span class="score-max">/ 100</span>
+        </div>
+        <div style="margin-top: 0.75rem; font-weight: 700; color: var(--text-main);">Overall Accuracy Score</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-top: 2rem;">
+        
+        <div>
+          <h3 style="color: var(--success); font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+            ✔ Key Strengths Demonstrated
+          </h3>
+          <div id="eval-strengths" class="list-section"></div>
+        </div>
+
+        <div>
+          <h3 style="color: var(--danger); font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+            ✖ Knowledge Gaps & Weaknesses Identified
+          </h3>
+          <div id="eval-weaknesses" class="list-section"></div>
+        </div>
+
+        <div>
+          <h3 style="color: var(--warning); font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+            📌 Actionable Study Recommendations ("Where to Work More")
+          </h3>
+          <div id="eval-areas" class="list-section"></div>
+        </div>
+
+        <div>
+          <h3 style="color: var(--primary); font-size: 1.1rem; margin-bottom: 0.5rem;">
+            Detailed Assessment Summary
+          </h3>
+          <div id="eval-report" style="background: rgba(15, 23, 42, 0.5); padding: 1rem; border-radius: 10px; line-height: 1.6; font-size: 0.95rem;"></div>
+        </div>
+
+      </div>
+
+      <button id="btn-restart" class="btn" style="width: 100%; margin-top: 2rem;">
+        🔄 Start Another Mock Interview
+      </button>
+    </section>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

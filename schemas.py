@@ -120,3 +120,20 @@ class EvaluationReportResponse(BaseModel):
     areas_of_improvement: List[str]
     detailed_report: str
     created_at: datetime
+
+
+class TranscriptionResponse(BaseModel):
+    filename: str
+    transcript: str
+    language: str = "en"
+    duration_seconds: float = 0.0
+
+
+class VoiceAnswerResponse(BaseModel):
+    status: str
+    interview_id: str
+    question_number: int
+    transcript: str
+    has_next: bool
+    next_question_number: Optional[int] = None
+
