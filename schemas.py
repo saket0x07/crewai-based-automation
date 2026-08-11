@@ -75,9 +75,10 @@ class ChatResponse(BaseModel):
 
 class InterviewStartRequest(BaseModel):
     document_id: str = Field(..., description="Target document_id of ingested resume")
-    num_questions: int = Field(default=5, ge=3, le=10, description="Number of questions to generate (3 to 10)")
+    num_questions: int = Field(default=5, ge=1, le=10, description="Number of questions to generate (1 to 10)")
     target_role: Optional[str] = Field(default=None, description="Target Job Title e.g. Senior Backend Engineer / AI Engineer")
     job_description: Optional[str] = Field(default=None, description="Optional Job Description text to align question focus")
+
 
 
 class InterviewStartResponse(BaseModel):

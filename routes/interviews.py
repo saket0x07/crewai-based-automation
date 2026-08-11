@@ -51,7 +51,8 @@ def start_mock_interview(
         raise HTTPException(status_code=404, detail=f"No candidate profile found for document_id: {payload.document_id}")
 
     structured_json = parsed_record.structured_json
-    num_questions = min(max(payload.num_questions, 3), 10)
+    num_questions = min(max(payload.num_questions, 1), 10)
+
     
     # Generate dynamic questions via CrewAI LLM
     questions_data = generate_interview_questions(

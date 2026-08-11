@@ -135,12 +135,13 @@ def conduct_interview(document_id: str):
     target_role = input(f"{BOLD}Enter Target Job Title (optional, e.g. 'Senior Backend Engineer') [Press Enter to skip]: {RESET}").strip()
     job_desc = input(f"{BOLD}Enter Job Description context (optional) [Press Enter to skip]: {RESET}").strip()
     
-    num_q_str = input(f"{BOLD}How many questions would you like? (3-10, default 5): {RESET}").strip()
+    num_q_str = input(f"{BOLD}How many questions would you like? (1-10, default 5): {RESET}").strip()
     try:
         num_questions = int(num_q_str) if num_q_str else 5
-        num_questions = min(max(num_questions, 3), 10)
+        num_questions = min(max(num_questions, 1), 10)
     except ValueError:
         num_questions = 5
+
 
     # 1. Start Interview Session
     print(f"\n{YELLOW}Initializing interview session & generating {num_questions} customized questions via CrewAI...{RESET}")
