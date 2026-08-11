@@ -105,13 +105,30 @@ document.addEventListener("DOMContentLoaded", () => {
       const uploadedId = await uploadResumeFile();
       if (!uploadedId) return;
       docId = uploadedId;
-    } else if (!docId) {
-      docId = "doc-" + Math.random().toString(36).substr(2, 9);
+    } else if (!docId || docId.startsWith("mock-")) {
+      // Re-fetch candidates from backend to get a valid real document_id
+      try {
+        const res = await fetch("/api/v1/resumes/");
+        if (res.ok) {
+          const candidates = await res.json();
+          if (Array.isArray(candidates) && candidates.length > 0) {
+            docId = candidates[0].document_id;
+          }
+        }
+      } catch (e) {
+        console.warn("Fallback candidate fetch failed:", e);
+      }
+    }
+
+    if (!docId || docId.startsWith("mock-")) {
+      alert("No saved candidate resume found in system. Please upload a resume file (.pdf, .docx, .txt) below to start!");
+      return;
     }
 
     currentDocumentId = docId;
     const targetRole = targetRoleInput.value.trim() || "AI Engineer";
     totalQuestions = parseInt(numQuestionsSelect.value, 10);
+
 
     btnStartInterview.disabled = true;
     btnStartInterview.textContent = "⚙️ Generating Customized Questions via CrewAI...";
