@@ -70,7 +70,13 @@ def transcribe_audio_file(
             )
             
         transcript_text = getattr(response, "text", "") or (response.get("text", "") if isinstance(response, dict) else "")
-        final_text = transcript_text.strip() if transcript_text else (cleaned_live or "No speech detected in recording.")
+        final_text = transcript_text.strip() if transcript_text else ""
+        
+        # Filter common Whisper API hallucinations for silent/noisy audio
+        lower_clean = final_text.strip(" .").lower()
+        if lower_clean in ["none", "thank you", "thank you for watching", ""]:
+            final_text = cleaned_live or "No speech detected in recording."
+        
         return {
             "transcript": final_text,
             "language": "en",

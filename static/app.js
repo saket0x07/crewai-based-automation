@@ -10,8 +10,26 @@ function initApp() {
   let audioChunks = [];
   let recordingTimerInterval = null;
   let recordingSeconds = 0;
-  let speechRecognition = null;
+  let whisperWorker = null;
   let capturedLiveTranscript = "";
+  let audioContext = null;
+
+  // Initialize Whisper Web Worker
+  whisperWorker = new Worker('/static/whisper-worker.js', { type: 'module' });
+  whisperWorker.onmessage = (event) => {
+    const { type, text, isFinal, data } = event.data;
+    if (type === 'result' && text) {
+      capturedLiveTranscript = text.trim();
+      transcriptText.textContent = `"${capturedLiveTranscript}"`;
+      transcriptContainer.classList.remove("hidden");
+    } else if (type === 'progress') {
+      if (data.status === 'progress') {
+         recordingStatus.textContent = `Loading AI Model... ${Math.round(data.progress)}%`;
+      } else if (data.status === 'ready') {
+         recordingStatus.textContent = "AI Model Ready. 🎙️ Recording Audio Answer... Speak now!";
+      }
+    }
+  };
 
   // DOM Elements
   const stepSetup = document.getElementById("step-setup");
@@ -200,6 +218,18 @@ function initApp() {
   btnMic.addEventListener("click", startRecording);
   btnStopVoice.addEventListener("click", stopAndSubmitVoiceRecording);
 
+  async function processAudioBuffer(audioBlob, isFinal) {
+    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    try {
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const float32Array = audioBuffer.getChannelData(0);
+      whisperWorker.postMessage({ type: 'transcribe', audio: float32Array, isFinal });
+    } catch (err) {
+      console.warn("Audio decode warning:", err);
+    }
+  }
+
   async function startRecording() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert("Microphone access is not supported in your browser.");
@@ -212,38 +242,16 @@ function initApp() {
       capturedLiveTranscript = "";
       mediaRecorder = new MediaRecorder(stream);
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunks.push(event.data);
+      mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size > 0) {
+           audioChunks.push(event.data);
+           if (audioChunks.length % 30 === 0) { // Transcribe roughly every 3 seconds
+               processAudioBuffer(new Blob(audioChunks, { type: 'audio/webm' }), false);
+           }
+        }
       };
 
       mediaRecorder.start(100);
-
-      // Initialize Web Speech API for real-time live browser transcription
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        try {
-          speechRecognition = new SpeechRecognition();
-          speechRecognition.continuous = true;
-          speechRecognition.interimResults = true;
-          speechRecognition.lang = 'en-US';
-
-          speechRecognition.onresult = (event) => {
-            let currentText = "";
-            for (let i = 0; i < event.results.length; i++) {
-              currentText += event.results[i][0].transcript + " ";
-            }
-            capturedLiveTranscript = currentText.trim();
-            if (capturedLiveTranscript) {
-              transcriptText.textContent = `"${capturedLiveTranscript}"`;
-              transcriptContainer.classList.remove("hidden");
-            }
-          };
-
-          speechRecognition.start();
-        } catch (srErr) {
-          console.warn("Browser SpeechRecognition initialization warning:", srErr);
-        }
-      }
 
       // UI state during recording
       btnMic.classList.add("recording");
@@ -267,10 +275,7 @@ function initApp() {
   }
 
   function resetRecordingUI() {
-    if (speechRecognition) {
-      try { speechRecognition.stop(); } catch(e) {}
-      speechRecognition = null;
-    }
+    // Whisper worker runs continuously, no need to stop it
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
       if (mediaRecorder.stream) {
@@ -292,19 +297,18 @@ function initApp() {
     recordingStatus.style.color = "var(--accent)";
     btnStopVoice.disabled = true;
 
-    if (speechRecognition) {
-      try { speechRecognition.stop(); } catch(e) {}
-    }
-
     mediaRecorder.stop();
     if (mediaRecorder.stream) {
       mediaRecorder.stream.getTracks().forEach(track => track.stop());
     }
     clearInterval(recordingTimerInterval);
 
-    // Give small delay for last audio chunk & WebSpeech result
+    const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+    recordingStatus.textContent = "⚡ Finalizing Speech Transcript with Whisper AI...";
+    await processAudioBuffer(audioBlob, true);
+
+    // Give small delay for Whisper worker to finish
     setTimeout(async () => {
-      const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
       const formData = new FormData();
       formData.append("file", audioBlob, `answer_q${currentQuestionIndex}.webm`);
       if (capturedLiveTranscript) {

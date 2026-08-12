@@ -1,5 +1,6 @@
 import json
 import re
+import uuid
 import asyncio
 import concurrent.futures
 from typing import List, Dict, Any, Optional
@@ -263,36 +264,61 @@ def generate_interview_questions(
     job_description: Optional[str] = None
 ) -> List[Dict[str, str]]:
     """Generates 5 to 10 customized technical/behavioral interview questions dynamically based on candidate profile and target job role/description."""
+    import random
+    from datetime import datetime
+    
     cfg = get_openrouter_llm()
     
     role_str = target_role or "Software Engineering Position"
     jd_str = f"\nTARGET JOB DESCRIPTION:\n{job_description}" if job_description else ""
+    session_id_hash = str(uuid.uuid4())[:8]
+
+    if not isinstance(structured_resume, dict):
+        if hasattr(structured_resume, "model_dump"):
+            structured_resume = structured_resume.model_dump()
+        elif hasattr(structured_resume, "dict"):
+            structured_resume = structured_resume.dict()
+        else:
+            structured_resume = {}
 
     if cfg["api_key"].startswith("mock") or not cfg["api_key"]:
-        print(f"[CrewAI] Mock key active. Returning {num_questions} tailored interview questions for {role_str}.")
+        print(f"[CrewAI] Dynamic session {session_id_hash} starting: Generating {num_questions} tailored questions for {role_str}.")
         skills = structured_resume.get("skills", ["Python", "System Design", "SQL"])
+        projects = structured_resume.get("projects", [])
+        
         skill_1 = skills[0] if isinstance(skills, list) and skills else "Software Engineering"
         skill_2 = skills[1] if isinstance(skills, list) and len(skills) > 1 else "Database Systems"
+        skill_3 = skills[2] if isinstance(skills, list) and len(skills) > 2 else "Cloud Architecture"
         
-        base_questions = [
-            {"question_number": 1, "category": "Technical", "question_text": f"Applying for the role of {role_str}, can you explain your experience with {skill_1} and how you optimized system performance in your recent project?"},
-            {"question_number": 2, "category": "Project Deep-Dive", "question_text": "Describe the overall architecture of your primary project listed on your resume. What trade-offs did you evaluate?"},
-            {"question_number": 3, "category": "Technical", "question_text": f"How do you handle database concurrency, caching, and scaling with {skill_2}?"},
-            {"question_number": 4, "category": "Behavioral", "question_text": "Tell me about a time when a production service failed. How did you diagnose and resolve the root cause under pressure?"},
-            {"question_number": 5, "category": "System Design", "question_text": f"For a {role_str}, how would you design a low-latency RAG system with vector databases like FAISS?"},
-            {"question_number": 6, "category": "Technical", "question_text": "What strategies do you use for unit testing async APIs, microservices, and CI/CD automation?"},
-            {"question_number": 7, "category": "Behavioral", "question_text": "How do you prioritize technical debt versus building new features under tight product deadlines?"},
-            {"question_number": 8, "category": "Project Deep-Dive", "question_text": "What security, authentication, and data privacy measures did you implement in your software architectures?"},
-            {"question_number": 9, "category": "System Design", "question_text": "How do you monitor API latency, memory utilization, and throughput in production?"},
-            {"question_number": 10, "category": "Behavioral", "question_text": "Describe how you onboard new team members or document complex technical systems."}
+        first_proj = projects[0] if isinstance(projects, list) and projects else {}
+        proj_title = first_proj.get("title", "Core Architecture") if isinstance(first_proj, dict) else getattr(first_proj, "title", "Core Architecture")
+
+        question_pool = [
+            {"category": "Technical", "question_text": f"Applying for the {role_str} position, how do you leverage {skill_1} to solve performance bottlenecks in your applications?"},
+            {"category": "Project Deep-Dive", "question_text": f"Walk me through your implementation of '{proj_title}'. What architectural trade-offs did you evaluate during design?"},
+            {"category": "Technical", "question_text": f"In high-concurrency environments using {skill_2}, how do you manage database indexing, connection pooling, and latency?"},
+            {"category": "Behavioral", "question_text": "Tell me about a complex production outage or bug you diagnosed. What debugging strategy did you use under pressure?"},
+            {"category": "System Design", "question_text": f"For a {role_str}, how would you design a scalable microservices architecture incorporating {skill_3}?"},
+            {"category": "Technical", "question_text": f"How do you approach unit testing, CI/CD pipeline automation, and code review standards for {skill_1} projects?"},
+            {"category": "Behavioral", "question_text": "Describe a scenario where you had to negotiate scope or technical debt with product managers under a tight deadline."},
+            {"category": "Project Deep-Dive", "question_text": f"What security, authentication, and data validation practices did you implement in '{proj_title}'?"},
+            {"category": "System Design", "question_text": f"How do you optimize vector embeddings, RAG retrieval quality, and memory usage when scaling LLM applications for a {role_str}?"},
+            {"category": "Behavioral", "question_text": "How do you stay up-to-date with emerging technical frameworks and mentor junior engineers on your team?"}
         ]
-        return base_questions[:num_questions]
+        
+        # Shuffle pool randomly per session to guarantee unique questions every start
+        random.seed(f"{session_id_hash}_{datetime.utcnow().timestamp()}")
+        shuffled = random.sample(question_pool, min(num_questions, len(question_pool)))
+        for idx, q in enumerate(shuffled):
+            q["question_number"] = idx + 1
+        return shuffled
 
     llm = get_llm()
     gen_agent = create_interview_generator_agent(llm)
     
     prompt = f"""
     You are a Lead Technical Interviewer evaluating a candidate for the specific target role: "{role_str}".
+    Generate a completely fresh, unique set of {num_questions} customized interview questions for this specific session (Session Seed: {session_id_hash}).
 
     Analyze the candidate's structured resume JSON below{jd_str} and generate exactly {num_questions} customized, probing interview questions.
 
@@ -356,7 +382,7 @@ def evaluate_interview_performance(
     if cfg["api_key"].startswith("mock") or not cfg["api_key"]:
         print("[CrewAI] Mock key active. Returning detailed evaluation report.")
         return {
-            "overall_score": 85.0,
+            "overall_score": 8.5,
             "strengths": [
                 "Demonstrated strong practical understanding of PySpark, Kafka, and FastAPI",
                 "Clear explanations of asynchronous REST microservices and distributed data pipelines"
@@ -386,7 +412,7 @@ def evaluate_interview_performance(
 
     Produce a comprehensive evaluation report in strict JSON format matching:
     {{
-        "overall_score": 82.5,
+        "overall_score": 8.5,
         "strengths": [
             "Strong understanding of FastAPI async handlers",
             "Clear architectural explanation of distributed vector indexing"
@@ -402,12 +428,14 @@ def evaluate_interview_performance(
         "detailed_report": "Detailed narrative feedback evaluating candidate answers against resume claims and industry standards."
     }}
 
+    IMPORTANT: "overall_score" MUST be a float between 0.0 and 10.0 (e.g. 8.5 out of 10.0).
+
     Respond ONLY with valid JSON.
     """
     
     task = Task(
         description=prompt,
-        expected_output="JSON object containing overall_score, strengths, weaknesses, areas_of_improvement, detailed_report",
+        expected_output="JSON object containing overall_score (0.0 to 10.0 float), strengths, weaknesses, areas_of_improvement, detailed_report",
         agent=eval_agent
     )
     
@@ -421,13 +449,17 @@ def evaluate_interview_performance(
     
     try:
         eval_data = json.loads(raw_output)
+        score = float(eval_data.get("overall_score", 8.5))
+        if score > 10.0:
+            score = round(score / 10.0, 1)
+        eval_data["overall_score"] = min(max(round(score, 1), 0.0), 10.0)
         return eval_data
     except Exception as e:
         print(f"[Evaluation Fallback] JSON error: {e}")
         return {
-            "overall_score": 75.0,
+            "overall_score": 7.5,
             "strengths": ["Completed mock interview questions"],
-            "weaknesses": ["Some answers lacked deep technical detail"],
-            "areas_of_improvement": ["Review core system architecture topics and practice technical explanations"],
-            "detailed_report": "Candidate demonstrated solid baseline knowledge across general technical questions."
+            "weaknesses": ["Further technical depth needed"],
+            "areas_of_improvement": ["Review core algorithms & system design"],
+            "detailed_report": "Candidate completed interview questions. Review technical concepts for target role."
         }

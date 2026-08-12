@@ -8,6 +8,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
+  <script type="module">
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.14.0';
+    // Configure transformers.js environment here if needed
+    env.allowLocalModels = false;
+  </script>
 </head>
 <body>
 
@@ -45,9 +50,9 @@
         <div class="form-group">
           <label for="num-questions">Number of Questions</label>
           <select id="num-questions">
-            <option value="1">1 Question (Quick Test)</option>
+            <option value="1" selected>1 Question (Quick Test)</option>
             <option value="3">3 Questions</option>
-            <option value="5" selected>5 Questions</option>
+            <option value="5">5 Questions</option>
             <option value="7">7 Questions</option>
             <option value="10">10 Questions</option>
           </select>
