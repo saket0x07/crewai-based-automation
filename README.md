@@ -106,32 +106,33 @@ graph TD
 ## 📂 Project Structure
 
 ```
-.
 ├── main.py                    # FastAPI main application entrypoint & static middleware
 ├── config.py                  # Application settings & OpenRouter LLM configuration
 ├── database.py                # SQLite database engine & session management
 ├── models.py                  # SQLAlchemy database models (Resumes, Interviews, QA Logs, Evaluations)
 ├── schemas.py                 # Pydantic v2 schemas for requests & responses
 ├── cli_interview.py           # Interactive Terminal CLI for step-by-step mock interviews
-├── interview_flow.md          # Visual architecture & sequence flow documentation
-├── voice_interview_readme.md  # Voice recording & STT architecture specifications
-├── prd.md                     # Product Requirement Document & Specifications
-├── architecture.md            # Technical architecture details & roadmap
 ├── requirements.txt           # Python dependencies
-├── agents/
-│   └── crew_manager.py        # CrewAI agents (Extractor, Chat, Question Generator, Evaluator)
-├── routes/
-│   ├── resumes.py             # Resume ingestion & RAG Chat API endpoints
-│   └── interviews.py          # Mock Interview state machine, voice submission & evaluation endpoints
-├── services/
-│   ├── audio_transcriber.py   # Faster-Whisper local STT service & browser fallback routing
-│   ├── extractor.py           # Text extraction utilities (PDF, DOCX, TXT)
-│   └── vector_store.py        # Section-aware chunking & FAISS manager
-├── static/
-│   ├── index.html             # Modern Glassmorphism Web App UI
-│   ├── app.js                 # Web UI controller, recorder, and state machine
-│   └── whisper-worker.js      # Client-side Transformers.js ONNX worker
-└── data/                      # Local uploads & persistent FAISS vector store
+├── agents/                    # CrewAI multi-agent framework (Extractor, Chat, Generator, Evaluator)
+│   └── crew_manager.py
+├── docs/                      # Technical architecture, system diagrams & PRD specifications
+│   ├── architecture.md
+│   ├── interview_flow.md
+│   └── prd.md
+├── routes/                    # FastAPI REST API endpoints
+│   ├── resumes.py
+│   └── interviews.py
+├── services/                  # Business logic services (STT Transcriber, Extractor, FAISS Vector Store)
+│   ├── audio_transcriber.py
+│   ├── extractor.py
+│   └── vector_store.py
+├── static/                    # Glassmorphism Web App UI assets
+│   ├── index.html
+│   ├── app.js
+│   └── whisper-worker.js
+└── tests/                     # Automated Pytest suite
+    ├── __init__.py
+    └── test_app.py
 ```
 
 ---
@@ -269,8 +270,9 @@ Your Answer > I leveraged Kafka partitioning, stateful window aggregation, and F
 
 ## 📜 Documentation
 
-- [interview_flow.md](interview_flow.md): Detailed visual sequence flow, architecture diagrams, and database schemas.
-- [voice_interview_readme.md](voice_interview_readme.md): Specifications for real-time speech-to-text recording and fallback routing.
+- [docs/interview_flow.md](docs/interview_flow.md): Detailed visual sequence flow, system architecture diagrams, and database ER schemas.
+- [docs/architecture.md](docs/architecture.md): Technical architecture specifications and implementation details.
+- [docs/prd.md](docs/prd.md): Product Requirements Document and feature roadmap.
 
 ---
 
