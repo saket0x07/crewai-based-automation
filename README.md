@@ -1,12 +1,13 @@
-# Agentic Hiring, RAG Chat & Interactive Mock Interview Platform 🚀
+# Agentic Hiring, RAG Chat & Interactive Voice Mock Interview Platform 🚀
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![CrewAI](https://img.shields.io/badge/CrewAI-Multi--Agent-FF6F61.svg?style=flat)](https://www.crewai.com/)
 [![FAISS](https://img.shields.io/badge/VectorDB-FAISS-00599C.svg?style=flat)](https://github.com/facebookresearch/faiss)
+[![Faster-Whisper](https://img.shields.io/badge/STT-Faster--Whisper-purple.svg?style=flat)](https://github.com/SYSTRAN/faster-whisper)
 [![SQLite](https://img.shields.io/badge/Database-SQLite-003B57.svg?style=flat&logo=sqlite)](https://www.sqlite.org/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=flat&logo=python)](https://www.python.org/)
 
-An enterprise-grade **AI-Driven Hiring & Candidate Evaluation System** built with **FastAPI**, **CrewAI**, **FAISS**, and **SQLite**. The platform ingests candidate resumes (PDF, DOCX, TXT), parses unstructured content into validated Pydantic JSON schemas, stores section-aware vector chunks for RAG queries, and conducts **interactive step-by-step mock interviews** with automated performance scoring.
+An enterprise-grade **AI-Driven Hiring & Candidate Evaluation System** built with **FastAPI**, **CrewAI**, **FAISS**, **Faster-Whisper**, and **SQLite**. The platform ingests candidate resumes (PDF, DOCX, TXT), parses unstructured content into validated Pydantic JSON schemas, indexes section-aware vector chunks for RAG queries, and conducts **interactive voice-enabled mock interviews** with real-time Speech-to-Text and automated performance scoring.
 
 ---
 
@@ -20,14 +21,18 @@ An enterprise-grade **AI-Driven Hiring & Candidate Evaluation System** built wit
    - **FAISS Vector DB**: Indexes enriched section chunks (`[WORK EXPERIENCE]`, `[PROJECTS]`, `[TECHNICAL SKILLS]`, `[EDUCATION]`) isolated by `document_id`.
 3. **Agentic RAG "Chat with Resume"**:
    - CrewAI `ResumeChatAgent` equipped with custom FAISS retrieval tool to answer detailed candidate background queries grounded strictly in resume context.
-4. **Dynamic Mock Interview & Sequential State Machine**:
-   - CrewAI `InterviewGeneratorAgent` synthesizes 5–10 customized technical, behavioral, and architectural questions aligned with candidate skills and optional `target_role` / `job_description`.
-   - Serves questions sequentially one-by-one (`/start`, `/next`, `/answer`).
-5. **AI Performance Scoring & Scorecard Generation**:
+4. **Dynamic Mock Interview Engine & State Machine**:
+   - CrewAI `InterviewGeneratorAgent` synthesizes 5–10 customized questions tailored to candidate resume experience, optional `target_role`, `job_description`, **Seniority Level** (Junior, Mid, Senior, Lead/Staff), and **Focus Area** (Full Mix, Technical Deep-Dive, System Design & Architecture, Behavioral & Leadership).
+   - Serves questions sequentially one-by-one (`/start`, `/next`, `/answer`, `/answer/voice`).
+5. **Real-Time Voice Answer Recording & Local STT**:
+   - Transcribes spoken audio answers using local zero-cost **`Faster-Whisper` (`base.en`)** with **technical domain vocabulary prompting** (boosting accuracy for terms like *FastAPI, PySpark, PostgreSQL, Docker, FAISS, CrewAI, Kubernetes*).
+   - Seamless zero-latency fallback to browser SpeechRecognition (`window.SpeechRecognition`) and client-side worker (`static/whisper-worker.js`).
+6. **AI Performance Scoring & Scorecard Generation**:
    - CrewAI `InterviewEvaluatorAgent` analyzes full transcript against candidate claims.
    - Computes an overall score (0–100%), candidate strengths, knowledge gaps, and an actionable **"Areas to Work More On"** study plan.
-6. **Interactive Terminal CLI (`cli_interview.py`)**:
-   - Conduct step-by-step mock interviews directly in your command line with colorful formatting, resume selection/upload, interactive prompts, and instant scorecard rendering.
+7. **Dual Interface Support (Web UI & Terminal CLI)**:
+   - **Web UI**: Modern glassmorphism frontend (`static/index.html` & `static/app.js`) with live microphone recording controls, real-time transcript preview, progress bar, and scorecard modal.
+   - **Terminal CLI (`cli_interview.py`)**: Conduct step-by-step mock interviews directly in your terminal with colorful formatting, seniority selection, and scorecard rendering.
 
 ---
 
@@ -35,31 +40,51 @@ An enterprise-grade **AI-Driven Hiring & Candidate Evaluation System** built wit
 
 ```mermaid
 graph TD
-    User([User / Recruiter / Candidate]) -->|1. Upload Resume| UploadAPI[FastAPI Endpoint: /upload]
-    UploadAPI -->|Extract & Clean| TextExtractor[pdfplumber / python-docx]
-    TextExtractor -->|Structured JSON| ExtractorAgent[CrewAI Resume Extractor Agent]
-    ExtractorAgent -->|Save Profile| SQLite[(SQLite Database)]
-    TextExtractor -->|Section Chunks| FAISSManager[FAISS Vector Store]
-    FAISSManager -->|Dense Embeddings| FAISS[(FAISS Index)]
+    subgraph Client Layer ["🖥️ Client Layer"]
+        UI["Web Browser App (static/app.js)"]
+        CLI["Terminal CLI (cli_interview.py)"]
+        Recorder["Browser Audio Recorder (MediaRecorder API)"]
+    end
 
-    User -->|2. RAG Query| ChatAPI[FastAPI Endpoint: /chat]
-    ChatAPI -->|Retrieve Context| FAISS
-    FAISS -->|Relevant Chunks| ChatAgent[CrewAI Resume Chat Agent]
-    ChatAgent -->|Grounded Answer| User
+    subgraph API Routing Layer ["⚙️ API Routing Layer"]
+        Router["FastAPI Router (routes/interviews.py & resumes.py)"]
+    end
 
-    User -->|3. Start Mock Interview| InterviewAPI[FastAPI Endpoint: /interview/start]
-    InterviewAPI -->|Read Candidate Profile| SQLite
-    SQLite -->|Profile Schema| QuestionGenAgent[CrewAI Question Generator Agent]
-    QuestionGenAgent -->|5-10 Custom Questions| SQLite
+    subgraph Multi-Agent Layer ["🤖 Multi-Agent Layer"]
+        CrewMgr["CrewAI Manager (agents/crew_manager.py)"]
+        ExtractorAgent["Resume Extractor Agent"]
+        ChatAgent["Resume Chat Agent"]
+        GenAgent["Interview Generator Agent"]
+        EvalAgent["Interview Evaluator Agent"]
+    end
 
-    User -->|4. Answer Q1..QN| InterviewAPI
-    InterviewAPI -->|Log Transcript| SQLite
+    subgraph Audio Service ["🎙️ Speech-to-Text Service"]
+        Transcriber["Audio Transcriber (services/audio_transcriber.py)"]
+        FasterWhisper["Local Faster-Whisper (base.en)"]
+        BrowserFallback["Browser SpeechRecognition Fallback"]
+    end
 
-    User -->|5. Finalize Interview| EvalAPI[FastAPI Endpoint: /finalize]
-    EvalAPI -->|Read Q&A Logs| SQLite
-    SQLite -->|Transcript| EvaluatorAgent[CrewAI Interview Evaluator Agent]
-    EvaluatorAgent -->|Scorecard & Study Plan| SQLite
-    EvaluatorAgent -->|Detailed Scorecard| User
+    subgraph Persistence Layer ["🗄️ Persistence Layer"]
+        DB[("SQLite DB (models.py)")]
+        FAISS[("FAISS Vector Index (vector_store.py)")]
+    end
+
+    UI --> Router
+    CLI --> Router
+    Recorder --> Router
+
+    Router <--> DB
+    Router <--> FAISS
+    Router --> CrewMgr
+    Router --> Transcriber
+
+    CrewMgr --> ExtractorAgent
+    CrewMgr --> ChatAgent
+    CrewMgr --> GenAgent
+    CrewMgr --> EvalAgent
+
+    Transcriber --> FasterWhisper
+    Transcriber --> BrowserFallback
 ```
 
 ---
@@ -70,9 +95,10 @@ graph TD
 | :--- | :--- | :--- |
 | **API Framework** | FastAPI (Python 3.10+) | Async REST API & OpenAPI docs |
 | **Multi-Agent Engine** | CrewAI | Autonomous agents for extraction, RAG, question generation & evaluation |
+| **Speech-to-Text (STT)** | `faster-whisper` + Web Speech API | High-accuracy local 8-bit quantized CPU transcription with domain prompting |
 | **LLM Provider** | OpenRouter / OpenAI GPT-4o / Claude 3.5 | Intelligence engine for agents & embeddings |
 | **Vector Store** | FAISS (`faiss-cpu`) | Dense semantic vector index per `document_id` |
-| **Relational Database** | SQLite + SQLAlchemy | Relational persistence for candidates, Q&A logs & scorecards |
+| **Relational Database** | SQLite + SQLAlchemy | Relational persistence for candidate profiles, Q&A logs & scorecards |
 | **Schema Validation** | Pydantic v2 | Strict JSON type validation |
 
 ---
@@ -81,27 +107,31 @@ graph TD
 
 ```
 .
-├── main.py                # FastAPI main application entrypoint & middleware
-├── config.py              # Application settings & OpenRouter configuration
-├── database.py            # SQLite database engine & session management
-├── models.py              # SQLAlchemy database models (Resumes, Interviews, QA Logs, Evaluations)
-├── schemas.py             # Pydantic v2 schemas for requests & responses
-├── cli_interview.py       # Interactive Terminal CLI for step-by-step mock interviews
-├── prd.md                 # Product Requirement Document & Specifications
-├── architecture.md        # Technical architecture details & roadmap
-├── requirements.txt       # Python dependencies
-├── verify_phase1.py       # Phase 1 verification script
-├── verify_phase2.py       # Phase 2 verification script
-├── test_app.py            # Pytest automated integration test suite
+├── main.py                    # FastAPI main application entrypoint & static middleware
+├── config.py                  # Application settings & OpenRouter LLM configuration
+├── database.py                # SQLite database engine & session management
+├── models.py                  # SQLAlchemy database models (Resumes, Interviews, QA Logs, Evaluations)
+├── schemas.py                 # Pydantic v2 schemas for requests & responses
+├── cli_interview.py           # Interactive Terminal CLI for step-by-step mock interviews
+├── interview_flow.md          # Visual architecture & sequence flow documentation
+├── voice_interview_readme.md  # Voice recording & STT architecture specifications
+├── prd.md                     # Product Requirement Document & Specifications
+├── architecture.md            # Technical architecture details & roadmap
+├── requirements.txt           # Python dependencies
 ├── agents/
-│   └── crew_manager.py    # CrewAI agents (Extractor, Chat, Question Generator, Evaluator)
+│   └── crew_manager.py        # CrewAI agents (Extractor, Chat, Question Generator, Evaluator)
 ├── routes/
-│   ├── resumes.py         # Ingestion & Chat API endpoints
-│   └── interviews.py      # Mock Interview state machine & evaluation endpoints
+│   ├── resumes.py             # Resume ingestion & RAG Chat API endpoints
+│   └── interviews.py          # Mock Interview state machine, voice submission & evaluation endpoints
 ├── services/
-│   ├── extractor.py       # Text extraction utilities (PDF, DOCX, TXT)
-│   └── vector_store.py    # Section-aware chunking & FAISS manager
-└── data/                  # Local uploads & persistent FAISS vector store
+│   ├── audio_transcriber.py   # Faster-Whisper local STT service & browser fallback routing
+│   ├── extractor.py           # Text extraction utilities (PDF, DOCX, TXT)
+│   └── vector_store.py        # Section-aware chunking & FAISS manager
+├── static/
+│   ├── index.html             # Modern Glassmorphism Web App UI
+│   ├── app.js                 # Web UI controller, recorder, and state machine
+│   └── whisper-worker.js      # Client-side Transformers.js ONNX worker
+└── data/                      # Local uploads & persistent FAISS vector store
 ```
 
 ---
@@ -144,28 +174,31 @@ DATABASE_URL="sqlite:///./app.db"
 OPENROUTER_API_KEY="your_openrouter_api_key_here"
 OPENROUTER_MODEL="openai/gpt-4o-mini"
 EMBEDDING_MODEL="text-embedding-3-small"
+
+# Optional: Faster-Whisper Local Model Size (default: base.en)
+WHISPER_MODEL_SIZE="base.en"
 ```
 
 ---
 
 ## 💻 Running the Application
 
-### Option A: Launch FastAPI Server & API Docs
+### Option A: Launch FastAPI Web Server & UI
 
-Start the FastAPI application server:
+Start the application server:
 
 ```bash
 python main.py
 ```
 
-- **Interactive API Documentation (Swagger UI)**: Open `http://127.0.0.1:8000/docs` in your browser.
-- **Alternative Docs (ReDoc)**: Open `http://127.0.0.1:8000/redoc`.
+- **Interactive Web App**: Open `http://127.0.0.1:8000/` in your browser.
+- **Swagger API Docs**: Open `http://127.0.0.1:8000/docs`.
 
 ---
 
 ### Option B: Interactive Terminal Interview CLI
 
-You can conduct step-by-step mock interviews right inside your command-line terminal!
+You can conduct step-by-step mock interviews directly inside your command-line terminal!
 
 1. Ensure the FastAPI server is running in one terminal window (`python main.py`).
 2. Open a second terminal window and run:
@@ -189,16 +222,29 @@ Existing Candidate Resumes in System:
 Select an option (1-2, U, Q): 1
 Selected Candidate: Saket
 
-Enter Target Job Title (optional, e.g. 'Senior Backend Engineer'): AI Engineer
-How many questions would you like? (3-10, default 5): 3
+Enter Target Job Title: Senior AI Engineer
+
+Select Seniority Level:
+  [1] Junior Level (Fundamentals & Core Syntax)
+  [2] Mid Level (Production Patterns & Query Tuning) [Default]
+  [3] Senior Level (High Concurrency & Architecture Trade-offs)
+  [4] Lead / Staff Level (Strategy & Scalability)
+Choice (1-4, default 2): 3
+
+Select Interview Focus Area:
+  [1] Full Mix (Balanced 360° Assessment) [Default]
+  [2] Technical Deep-Dive (Coding & Framework Internals)
+  [3] System Design & Architecture (Microservices & Caching)
+  [4] Behavioral & Leadership (STAR Method & Scenarios)
+Choice (1-4, default 1): 3
 
 ======================================================================
-  QUESTION 1 OF 3  [TECHNICAL]
+  QUESTION 1 OF 5  [SYSTEM DESIGN & ARCHITECTURE]
 ======================================================================
-Can you explain how you designed real-time data pipelines using FastAPI and Spark?
+Can you walk us through how you design high-throughput PySpark streaming data pipelines to handle backpressure and query latency?
 
 Commands: Type your answer below, or type ':skip' to skip, ':exit' to quit.
-Your Answer > I implemented PySpark streaming consumers with FastAPI async handlers...
+Your Answer > I leveraged Kafka partitioning, stateful window aggregation, and FAISS indexing...
 ```
 
 ---
@@ -208,31 +254,23 @@ Your Answer > I implemented PySpark streaming consumers with FastAPI async handl
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `POST` | `/api/v1/resumes/upload` | Upload PDF/DOCX/TXT resume, parse structured JSON & index into FAISS |
+| `GET` | `/api/v1/resumes/` | List all ingested candidate profiles |
 | `GET` | `/api/v1/resumes/{document_id}` | Retrieve stored candidate structured profile JSON |
 | `POST` | `/api/v1/resumes/{document_id}/chat` | Query candidate resume content using CrewAI Agentic RAG |
-| `POST` | `/api/v1/interview/start` | Initialize mock interview session & generate custom questions |
+| `POST` | `/api/v1/interview/start` | Initialize mock interview session with seniority & focus parameters |
 | `GET` | `/api/v1/interview/{interview_id}/next` | Get current question in sequential state machine |
-| `POST` | `/api/v1/interview/{interview_id}/answer` | Record candidate response text and advance question state |
+| `POST` | `/api/v1/interview/{interview_id}/answer` | Record text response and advance question state |
+| `POST` | `/api/v1/interview/{interview_id}/answer/voice` | Record `.webm` audio, transcribe via `Faster-Whisper` & advance state |
+| `POST` | `/api/v1/interview/transcribe` | Standalone audio transcription endpoint |
 | `POST` | `/api/v1/interview/{interview_id}/finalize` | Trigger CrewAI performance evaluation & generate scorecard |
 | `GET` | `/api/v1/interview/{interview_id}/report` | Retrieve saved evaluation scorecard report from SQLite |
 
 ---
 
-## 🧪 Running Automated Tests
+## 📜 Documentation
 
-Run the full integration test suite using `pytest`:
-
-```bash
-pytest test_app.py -v
-```
-
-Verification output:
-```text
-test_app.py::test_root_endpoint PASSED
-test_app.py::test_resume_upload_and_mock_interview_flow PASSED
-
-======================= 2 passed in 42.70s =======================
-```
+- [interview_flow.md](interview_flow.md): Detailed visual sequence flow, architecture diagrams, and database schemas.
+- [voice_interview_readme.md](voice_interview_readme.md): Specifications for real-time speech-to-text recording and fallback routing.
 
 ---
 
