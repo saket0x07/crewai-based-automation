@@ -142,14 +142,33 @@ def conduct_interview(document_id: str):
     except ValueError:
         num_questions = 5
 
+    print(f"\n{BOLD}Select Seniority Level:{RESET}")
+    print("  [1] Junior Level (Fundamentals & Core Syntax)")
+    print("  [2] Mid Level (Production Patterns & Query Tuning) [Default]")
+    print("  [3] Senior Level (High Concurrency & Architecture Trade-offs)")
+    print("  [4] Lead / Staff Level (Strategy & Scalability)")
+    diff_choice = input(f"{CYAN}Choice (1-4, default 2): {RESET}").strip()
+    diff_map = {"1": "Junior", "2": "Mid", "3": "Senior", "4": "Lead / Staff"}
+    difficulty_level = diff_map.get(diff_choice, "Mid")
+
+    print(f"\n{BOLD}Select Interview Focus Area:{RESET}")
+    print("  [1] Full Mix (Balanced 360° Assessment) [Default]")
+    print("  [2] Technical Deep-Dive (Coding & Framework Internals)")
+    print("  [3] System Design & Architecture (Microservices & Caching)")
+    print("  [4] Behavioral & Leadership (STAR Method & Scenarios)")
+    focus_choice = input(f"{CYAN}Choice (1-4, default 1): {RESET}").strip()
+    focus_map = {"1": "Full Mix", "2": "Technical Deep-Dive", "3": "System Design & Architecture", "4": "Behavioral & Leadership"}
+    focus_area = focus_map.get(focus_choice, "Full Mix")
 
     # 1. Start Interview Session
-    print(f"\n{YELLOW}Initializing interview session & generating {num_questions} customized questions via CrewAI...{RESET}")
+    print(f"\n{YELLOW}Initializing [{difficulty_level} / {focus_area}] interview session via CrewAI...{RESET}")
     start_payload = {
         "document_id": document_id,
         "num_questions": num_questions,
         "target_role": target_role if target_role else None,
-        "job_description": job_desc if job_desc else None
+        "job_description": job_desc if job_desc else None,
+        "difficulty_level": difficulty_level,
+        "focus_area": focus_area
     }
     
     try:
@@ -233,7 +252,9 @@ def conduct_interview(document_id: str):
 
 def display_scorecard(report: Dict[str, Any], elapsed_seconds: float):
     """Renders a formatted evaluation scorecard in the terminal."""
-    score = report.get("overall_score", 0.0)
+    score = float(report.get("overall_score", 0.0))
+    if score <= 10.0:
+        score = score * 10.0
     strengths = report.get("strengths", [])
     weaknesses = report.get("weaknesses", [])
     areas = report.get("areas_of_improvement", [])

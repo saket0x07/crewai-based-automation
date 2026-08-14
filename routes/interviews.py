@@ -55,12 +55,17 @@ def start_mock_interview(
     num_questions = min(max(payload.num_questions, 1), 10)
 
     
+    diff_level = payload.difficulty_level or "Mid"
+    foc_area = payload.focus_area or "Full Mix"
+
     # Generate dynamic questions via CrewAI LLM
     questions_data = generate_interview_questions(
         structured_resume=structured_json,
         num_questions=num_questions,
         target_role=payload.target_role,
-        job_description=payload.job_description
+        job_description=payload.job_description,
+        difficulty_level=diff_level,
+        focus_area=foc_area
     )
     
     interview_id = str(uuid.uuid4())
@@ -69,6 +74,8 @@ def start_mock_interview(
         document_id=payload.document_id,
         total_questions=len(questions_data),
         current_index=0,
+        difficulty_level=diff_level,
+        focus_area=foc_area,
         status="IN_PROGRESS",
         created_at=datetime.utcnow()
     )
@@ -92,6 +99,8 @@ def start_mock_interview(
         interview_id=interview_id,
         document_id=payload.document_id,
         total_questions=len(questions_data),
+        difficulty_level=diff_level,
+        focus_area=foc_area,
         status="STARTED"
     )
 

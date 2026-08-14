@@ -40,6 +40,8 @@ class MockInterviewModel(Base):
     document_id = Column(String(36), ForeignKey("resumes.document_id", ondelete="CASCADE"), nullable=False)
     total_questions = Column(Integer, nullable=False, default=5)
     current_index = Column(Integer, nullable=False, default=0)
+    difficulty_level = Column(String(50), nullable=True, default="Mid")
+    focus_area = Column(String(100), nullable=True, default="Full Mix")
     status = Column(String(50), nullable=False, default="IN_PROGRESS")  # IN_PROGRESS, COMPLETED, ABORTED
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

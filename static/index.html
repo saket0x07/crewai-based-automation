@@ -50,13 +50,33 @@
         <div class="form-group">
           <label for="num-questions">Number of Questions</label>
           <select id="num-questions">
-            <option value="1" selected>1 Question (Quick Test)</option>
+            <option value="1">1 Question (Quick Test)</option>
             <option value="3">3 Questions</option>
-            <option value="5">5 Questions</option>
+            <option value="5" selected>5 Questions</option>
             <option value="7">7 Questions</option>
             <option value="10">10 Questions</option>
           </select>
+        </div>
+      </div>
 
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+        <div class="form-group">
+          <label for="difficulty-level">Seniority Level</label>
+          <select id="difficulty-level">
+            <option value="Junior">Junior Level (Fundamentals & Core Syntax)</option>
+            <option value="Mid" selected>Mid Level (Production Patterns & Optimization)</option>
+            <option value="Senior">Senior Level (High Concurrency & System Trade-offs)</option>
+            <option value="Lead / Staff">Lead / Staff Level (Technical Strategy & Scalability)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="focus-area">Interview Focus Area</label>
+          <select id="focus-area">
+            <option value="Full Mix" selected>Full Mix (Balanced 360° Assessment)</option>
+            <option value="Technical Deep-Dive">Technical Deep-Dive (Coding & Frameworks)</option>
+            <option value="System Design & Architecture">System Design (Scalability & Microservices)</option>
+            <option value="Behavioral & Leadership">Behavioral & Leadership (STAR Method)</option>
+          </select>
         </div>
       </div>
 

@@ -78,13 +78,16 @@ class InterviewStartRequest(BaseModel):
     num_questions: int = Field(default=5, ge=1, le=10, description="Number of questions to generate (1 to 10)")
     target_role: Optional[str] = Field(default=None, description="Target Job Title e.g. Senior Backend Engineer / AI Engineer")
     job_description: Optional[str] = Field(default=None, description="Optional Job Description text to align question focus")
-
+    difficulty_level: Optional[str] = Field(default="Mid", description="Seniority Level e.g. Junior, Mid, Senior, Lead / Staff")
+    focus_area: Optional[str] = Field(default="Full Mix", description="Interview Focus e.g. Full Mix, Technical Deep-Dive, System Design & Architecture, Behavioral & Leadership")
 
 
 class InterviewStartResponse(BaseModel):
     interview_id: str
     document_id: str
     total_questions: int
+    difficulty_level: str = "Mid"
+    focus_area: str = "Full Mix"
     status: str
 
 

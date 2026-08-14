@@ -14,14 +14,54 @@ function initApp() {
   let capturedLiveTranscript = "";
   let audioContext = null;
 
+  // Initialize browser SpeechRecognition
+  let recognition = null;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      let fullTranscript = '';
+      for (let i = 0; i < event.results.length; ++i) {
+        fullTranscript += event.results[i][0].transcript + ' ';
+      }
+      const combined = fullTranscript.trim();
+      if (combined) {
+        capturedLiveTranscript = combined;
+        transcriptText.textContent = `"${capturedLiveTranscript}"`;
+        transcriptContainer.classList.remove("hidden");
+      }
+    };
+
+    recognition.onend = () => {
+      if (btnMic && btnMic.classList.contains("recording")) {
+        try {
+          recognition.start();
+        } catch (e) {
+          // Already started
+        }
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.warn("Speech recognition error:", event.error);
+    };
+  }
+
   // Initialize Whisper Web Worker
   whisperWorker = new Worker('/static/whisper-worker.js', { type: 'module' });
   whisperWorker.onmessage = (event) => {
     const { type, text, isFinal, data } = event.data;
     if (type === 'result' && text) {
-      capturedLiveTranscript = text.trim();
-      transcriptText.textContent = `"${capturedLiveTranscript}"`;
-      transcriptContainer.classList.remove("hidden");
+      // Only set from worker if SpeechRecognition didn't produce a better transcript
+      if (!capturedLiveTranscript) {
+        capturedLiveTranscript = text.trim();
+        transcriptText.textContent = `"${capturedLiveTranscript}"`;
+        transcriptContainer.classList.remove("hidden");
+      }
     } else if (type === 'progress') {
       if (data.status === 'progress') {
          recordingStatus.textContent = `Loading AI Model... ${Math.round(data.progress)}%`;
@@ -40,6 +80,8 @@ function initApp() {
   const resumeFileInput = document.getElementById("resume-file");
   const targetRoleInput = document.getElementById("target-role");
   const numQuestionsSelect = document.getElementById("num-questions");
+  const difficultySelect = document.getElementById("difficulty-level");
+  const focusSelect = document.getElementById("focus-area");
   const btnStartInterview = document.getElementById("btn-start-interview");
 
   const questionCategory = document.getElementById("question-category");
@@ -152,7 +194,8 @@ function initApp() {
     currentDocumentId = docId;
     const targetRole = targetRoleInput.value.trim() || "AI Engineer";
     totalQuestions = parseInt(numQuestionsSelect.value, 10);
-
+    const difficultyLevel = difficultySelect ? difficultySelect.value : "Mid";
+    const focusArea = focusSelect ? focusSelect.value : "Full Mix";
 
     btnStartInterview.disabled = true;
     btnStartInterview.textContent = "⚙️ Generating Customized Questions via CrewAI...";
@@ -164,7 +207,9 @@ function initApp() {
         body: JSON.stringify({
           document_id: currentDocumentId,
           num_questions: totalQuestions,
-          target_role: targetRole
+          target_role: targetRole,
+          difficulty_level: difficultyLevel,
+          focus_area: focusArea
         })
       });
 
@@ -240,14 +285,21 @@ function initApp() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunks = [];
       capturedLiveTranscript = "";
+      
+      // Start browser SpeechRecognition if available
+      if (recognition) {
+        try {
+          recognition.start();
+        } catch (recognitionError) {
+          console.warn("SpeechRecognition start error:", recognitionError);
+        }
+      }
+
       mediaRecorder = new MediaRecorder(stream);
 
-      mediaRecorder.ondataavailable = async (event) => {
+      mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
            audioChunks.push(event.data);
-           if (audioChunks.length % 30 === 0) { // Transcribe roughly every 3 seconds
-               processAudioBuffer(new Blob(audioChunks, { type: 'audio/webm' }), false);
-           }
         }
       };
 
@@ -275,7 +327,13 @@ function initApp() {
   }
 
   function resetRecordingUI() {
-    // Whisper worker runs continuously, no need to stop it
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch (recognitionError) {
+        // Already stopped or not started
+      }
+    }
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
       if (mediaRecorder.stream) {
@@ -297,6 +355,15 @@ function initApp() {
     recordingStatus.style.color = "var(--accent)";
     btnStopVoice.disabled = true;
 
+    // Stop SpeechRecognition to finalize the transcript
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch (recognitionError) {
+        console.warn("SpeechRecognition stop error:", recognitionError);
+      }
+    }
+
     mediaRecorder.stop();
     if (mediaRecorder.stream) {
       mediaRecorder.stream.getTracks().forEach(track => track.stop());
@@ -304,48 +371,56 @@ function initApp() {
     clearInterval(recordingTimerInterval);
 
     const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
-    recordingStatus.textContent = "⚡ Finalizing Speech Transcript with Whisper AI...";
-    await processAudioBuffer(audioBlob, true);
+    recordingStatus.textContent = "⚡ Finalizing Speech Transcript...";
+    
+    // Process final audio buffer with Whisper worker
+    processAudioBuffer(audioBlob, true);
 
-    // Give small delay for Whisper worker to finish
-    setTimeout(async () => {
-      const formData = new FormData();
-      formData.append("file", audioBlob, `answer_q${currentQuestionIndex}.webm`);
-      if (capturedLiveTranscript) {
-        formData.append("live_transcript", capturedLiveTranscript);
+    // Wait for the transcript to be captured (up to 1.5 seconds) before sending to server
+    let checks = 0;
+    const intervalId = setInterval(async () => {
+      checks++;
+      if (capturedLiveTranscript || checks >= 15) {
+        clearInterval(intervalId);
+        
+        const formData = new FormData();
+        formData.append("file", audioBlob, `answer_q${currentQuestionIndex}.webm`);
+        if (capturedLiveTranscript) {
+          formData.append("live_transcript", capturedLiveTranscript);
+        }
+
+        try {
+          const res = await fetch(`/api/v1/interview/${currentInterviewId}/answer/voice`, {
+            method: "POST",
+            body: formData
+          });
+
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+
+          // Render Real-Time Transcript in UI
+          transcriptText.textContent = `"${data.transcript}"`;
+          transcriptContainer.classList.remove("hidden");
+
+          btnStopVoice.disabled = false;
+          resetRecordingUI();
+
+          // Proceed to next question after 1.5 seconds so user reads transcript
+          setTimeout(() => {
+            if (data.has_next) {
+              loadNextQuestion();
+            } else {
+              finalizeAndShowEvaluation();
+            }
+          }, 1500);
+
+        } catch (e) {
+          alert("Error submitting voice answer: " + e.message);
+          btnStopVoice.disabled = false;
+          resetRecordingUI();
+        }
       }
-
-      try {
-        const res = await fetch(`/api/v1/interview/${currentInterviewId}/answer/voice`, {
-          method: "POST",
-          body: formData
-        });
-
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-
-        // Render Real-Time Transcript in UI
-        transcriptText.textContent = `"${data.transcript}"`;
-        transcriptContainer.classList.remove("hidden");
-
-        btnStopVoice.disabled = false;
-        resetRecordingUI();
-
-        // Proceed to next question after 1.5 seconds so user reads transcript
-        setTimeout(() => {
-          if (data.has_next) {
-            loadNextQuestion();
-          } else {
-            finalizeAndShowEvaluation();
-          }
-        }, 1500);
-
-      } catch (e) {
-        alert("Error submitting voice answer: " + e.message);
-        btnStopVoice.disabled = false;
-        resetRecordingUI();
-      }
-    }, 400);
+    }, 100);
   }
 
 
@@ -412,7 +487,9 @@ function initApp() {
       if (!res.ok) throw new Error(await res.text());
       const report = await res.json();
 
-      evalScore.textContent = Math.round(report.overall_score || 80);
+      const rawScore = Number(report.overall_score) || 8.0;
+      const normalizedScore = rawScore <= 10.0 ? Math.round(rawScore * 10) : Math.round(rawScore);
+      evalScore.textContent = normalizedScore;
       
       renderList(evalStrengths, report.strengths, "icon-green", "✔");
       renderList(evalWeaknesses, report.weaknesses, "icon-red", "✖");

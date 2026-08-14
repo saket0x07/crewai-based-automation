@@ -261,15 +261,19 @@ def generate_interview_questions(
     structured_resume: Dict[str, Any],
     num_questions: int = 5,
     target_role: Optional[str] = None,
-    job_description: Optional[str] = None
+    job_description: Optional[str] = None,
+    difficulty_level: Optional[str] = "Mid",
+    focus_area: Optional[str] = "Full Mix"
 ) -> List[Dict[str, str]]:
-    """Generates 5 to 10 customized technical/behavioral interview questions dynamically based on candidate profile and target job role/description."""
+    """Generates customized technical/behavioral interview questions dynamically based on candidate profile, target role, difficulty level, and focus area."""
     import random
     from datetime import datetime
     
     cfg = get_openrouter_llm()
     
     role_str = target_role or "Software Engineering Position"
+    diff_str = difficulty_level or "Mid"
+    focus_str = focus_area or "Full Mix"
     jd_str = f"\nTARGET JOB DESCRIPTION:\n{job_description}" if job_description else ""
     session_id_hash = str(uuid.uuid4())[:8]
 
@@ -282,7 +286,7 @@ def generate_interview_questions(
             structured_resume = {}
 
     if cfg["api_key"].startswith("mock") or not cfg["api_key"]:
-        print(f"[CrewAI] Dynamic session {session_id_hash} starting: Generating {num_questions} tailored questions for {role_str}.")
+        print(f"[CrewAI] Dynamic session {session_id_hash} starting: Generating {num_questions} [{diff_str} / {focus_str}] questions for {role_str}.")
         skills = structured_resume.get("skills", ["Python", "System Design", "SQL"])
         projects = structured_resume.get("projects", [])
         
@@ -294,16 +298,16 @@ def generate_interview_questions(
         proj_title = first_proj.get("title", "Core Architecture") if isinstance(first_proj, dict) else getattr(first_proj, "title", "Core Architecture")
 
         question_pool = [
-            {"category": "Technical", "question_text": f"Applying for the {role_str} position, how do you leverage {skill_1} to solve performance bottlenecks in your applications?"},
-            {"category": "Project Deep-Dive", "question_text": f"Walk me through your implementation of '{proj_title}'. What architectural trade-offs did you evaluate during design?"},
-            {"category": "Technical", "question_text": f"In high-concurrency environments using {skill_2}, how do you manage database indexing, connection pooling, and latency?"},
-            {"category": "Behavioral", "question_text": "Tell me about a complex production outage or bug you diagnosed. What debugging strategy did you use under pressure?"},
-            {"category": "System Design", "question_text": f"For a {role_str}, how would you design a scalable microservices architecture incorporating {skill_3}?"},
-            {"category": "Technical", "question_text": f"How do you approach unit testing, CI/CD pipeline automation, and code review standards for {skill_1} projects?"},
-            {"category": "Behavioral", "question_text": "Describe a scenario where you had to negotiate scope or technical debt with product managers under a tight deadline."},
+            {"category": "Technical", "question_text": f"Applying as a {diff_str} candidate for {role_str}, how do you leverage {skill_1} to solve performance bottlenecks in high-throughput applications?"},
+            {"category": "Project Deep-Dive", "question_text": f"Walk me through your implementation of '{proj_title}'. At a {diff_str} level, what architectural trade-offs did you evaluate during design?"},
+            {"category": "Technical", "question_text": f"In production environments using {skill_2}, how do you manage database indexing, connection pooling, and query latency?"},
+            {"category": "Behavioral", "question_text": "Tell me about a complex production outage or bug you diagnosed. What debugging strategy did you execute under pressure?"},
+            {"category": "System Design", "question_text": f"For a {diff_str} {role_str}, how would you design a fault-tolerant, scalable microservices architecture incorporating {skill_3}?"},
+            {"category": "Technical", "question_text": f"How do you approach automated testing, CI/CD pipeline deployment, and code review standards for {skill_1} projects?"},
+            {"category": "Behavioral", "question_text": "Describe a scenario where you had to negotiate technical debt or scope cutbacks with product managers under a tight deadline."},
             {"category": "Project Deep-Dive", "question_text": f"What security, authentication, and data validation practices did you implement in '{proj_title}'?"},
             {"category": "System Design", "question_text": f"How do you optimize vector embeddings, RAG retrieval quality, and memory usage when scaling LLM applications for a {role_str}?"},
-            {"category": "Behavioral", "question_text": "How do you stay up-to-date with emerging technical frameworks and mentor junior engineers on your team?"}
+            {"category": "Behavioral", "question_text": "How do you stay up-to-date with emerging technical frameworks and mentor team members on best practices?"}
         ]
         
         # Shuffle pool randomly per session to guarantee unique questions every start
@@ -317,18 +321,25 @@ def generate_interview_questions(
     gen_agent = create_interview_generator_agent(llm)
     
     prompt = f"""
-    You are a Lead Technical Interviewer evaluating a candidate for the specific target role: "{role_str}".
-    Generate a completely fresh, unique set of {num_questions} customized interview questions for this specific session (Session Seed: {session_id_hash}).
+    You are a Lead Technical Interviewer evaluating a candidate for the target role: "{role_str}".
+    Seniority Level: {diff_str}
+    Interview Focus Area: {focus_str}
 
-    Analyze the candidate's structured resume JSON below{jd_str} and generate exactly {num_questions} customized, probing interview questions.
+    Generate a fresh, unique set of {num_questions} customized interview questions for this specific session (Session Seed: {session_id_hash}).
+
+    Analyze the candidate's structured resume JSON below{jd_str} and generate exactly {num_questions} customized interview questions.
 
     Requirements:
-    1. Tailor questions specifically to the candidate's actual projects, experience, and skills on their resume, while aligning with the target role ({role_str}).
-    2. Include a dynamic mix of:
-       - Technical Deep-Dives (probing specific tools, frameworks, and programming languages listed on resume).
-       - Project Architecture Deep-Dives (asking about trade-offs, scalability, and design decisions in their listed projects).
-       - Role-Specific System Design (customized to the target role: {role_str}).
-       - Behavioral & Problem-Solving Scenarios (testing communication, debugging real outages, and handling deadlines).
+    1. Adjust question depth strictly according to Seniority Level ({diff_str}):
+       - Junior: Focus on core syntax, algorithms, framework fundamentals, and learning agility.
+       - Mid: Focus on production practices, design patterns, database query tuning, and code maintainability.
+       - Senior: Focus on high concurrency, distributed systems trade-offs, performance tuning, and technical debt management.
+       - Lead / Staff: Focus on cross-team technical strategy, system scalability, architectural decisions, and mentoring.
+    2. Tailor question mix according to Focus Area ({focus_str}):
+       - Full Mix: Balanced mix of Technical, Project Deep-Dive, System Design, and Behavioral.
+       - Technical Deep-Dive: Focus predominantly on programming languages, frameworks, APIs, and tools listed on resume.
+       - System Design & Architecture: Focus predominantly on scalable architecture, data modeling, microservices, and caching.
+       - Behavioral & Leadership: Focus predominantly on STAR method scenarios, team conflict, product trade-offs, and project leadership.
     3. Make each question specific, distinct, and directly relevant to the candidate's background.
 
     CANDIDATE RESUME JSON:
@@ -428,14 +439,14 @@ def evaluate_interview_performance(
         "detailed_report": "Detailed narrative feedback evaluating candidate answers against resume claims and industry standards."
     }}
 
-    IMPORTANT: "overall_score" MUST be a float between 0.0 and 10.0 (e.g. 8.5 out of 10.0).
+    IMPORTANT: "overall_score" MUST be a float between 0.0 and 100.0 (e.g. 85.0 out of 100.0).
 
     Respond ONLY with valid JSON.
     """
     
     task = Task(
         description=prompt,
-        expected_output="JSON object containing overall_score (0.0 to 10.0 float), strengths, weaknesses, areas_of_improvement, detailed_report",
+        expected_output="JSON object containing overall_score (0.0 to 100.0 float), strengths, weaknesses, areas_of_improvement, detailed_report",
         agent=eval_agent
     )
     
@@ -449,10 +460,10 @@ def evaluate_interview_performance(
     
     try:
         eval_data = json.loads(raw_output)
-        score = float(eval_data.get("overall_score", 8.5))
-        if score > 10.0:
-            score = round(score / 10.0, 1)
-        eval_data["overall_score"] = min(max(round(score, 1), 0.0), 10.0)
+        score = float(eval_data.get("overall_score", 85.0))
+        if score <= 10.0:
+            score = score * 10.0
+        eval_data["overall_score"] = min(max(round(score, 1), 0.0), 100.0)
         return eval_data
     except Exception as e:
         print(f"[Evaluation Fallback] JSON error: {e}")
